@@ -1,0 +1,4 @@
+# Netlify Redirects File
+# This ensures the single-page app works correctly
+
+/*    /index.html   200
