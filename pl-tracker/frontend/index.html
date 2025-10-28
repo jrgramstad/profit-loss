@@ -12,8 +12,8 @@
         <div class="nav-container">
             <h1 class="nav-logo">P&L Transaction Manager</h1>
             <div class="nav-menu">
-                <button class="nav-button active" data-screen="import">Import CSV</button>
-                <button class="nav-button" data-screen="assign">Property Assignment</button>
+                <button class="nav-button" data-screen="import">Import JSON</button>
+                <button class="nav-button active" data-screen="assign">Property Assignment</button>
                 <button class="nav-button" data-screen="view">All Transactions</button>
             </div>
         </div>
@@ -31,25 +31,36 @@
     <!-- Main Content Container -->
     <div class="main-container">
 
-        <!-- SCREEN 1: CSV IMPORT -->
-        <div id="import-screen" class="screen active">
+        <!-- SCREEN 1: JSON IMPORT -->
+        <div id="import-screen" class="screen">
             <div class="screen-header">
-                <h2>Import Transactions from CSV</h2>
-                <p class="subtitle">Upload your CSV file to import transactions into the database</p>
+                <h2>Import Transactions from JSON Backup</h2>
+                <p class="subtitle">Upload your JSON backup file to import transactions into the database</p>
             </div>
 
             <div class="import-section">
                 <div class="upload-area">
-                    <input type="file" id="csv-file-input" accept=".csv" hidden>
+                    <input type="file" id="json-file-input" accept=".json" hidden>
                     <button id="upload-btn" class="btn btn-primary btn-large">
                         <span class="btn-icon">📁</span>
-                        Choose CSV File
+                        Choose JSON File
                     </button>
-                    <p class="helper-text">Expected format: id, date, description, amount, type, category, property, job, account, transactionType, source, created, modified</p>
+                    <p class="helper-text">Expected format: JSON file with "transactions" array containing transaction objects</p>
                 </div>
 
                 <div id="preview-section" class="preview-section hidden">
-                    <h3>Preview (First 10 Rows)</h3>
+                    <h3>Preview</h3>
+                    <div class="preview-summary">
+                        <div class="summary-item">
+                            <span class="summary-label">Total Transactions:</span>
+                            <span id="preview-count" class="summary-value">0</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Sample Transaction:</span>
+                            <pre id="preview-sample" class="sample-json"></pre>
+                        </div>
+                    </div>
+                    <h3>First 10 Transactions</h3>
                     <div class="table-container">
                         <table id="preview-table" class="data-table">
                             <thead id="preview-header"></thead>
@@ -88,7 +99,7 @@
         </div>
 
         <!-- SCREEN 2: PROPERTY ASSIGNMENT -->
-        <div id="assign-screen" class="screen">
+        <div id="assign-screen" class="screen active">
             <div class="screen-header">
                 <h2>Property Assignment Tool</h2>
                 <div id="progress-indicator" class="progress-indicator">

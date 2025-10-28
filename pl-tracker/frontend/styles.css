@@ -248,6 +248,49 @@ body {
     color: var(--gray-900);
 }
 
+.preview-summary {
+    display: flex;
+    gap: var(--spacing-xl);
+    margin-bottom: var(--spacing-xl);
+    flex-wrap: wrap;
+}
+
+.summary-item {
+    flex: 1;
+    min-width: 250px;
+    background-color: var(--gray-50);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-md);
+    border-left: 4px solid var(--primary-blue);
+}
+
+.summary-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    margin-bottom: var(--spacing-xs);
+}
+
+.summary-value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-900);
+}
+
+.sample-json {
+    background-color: var(--gray-900);
+    color: var(--gray-100);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-sm);
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    overflow-x: auto;
+    max-height: 200px;
+    margin-top: var(--spacing-sm);
+}
+
 .import-actions {
     margin-top: var(--spacing-lg);
     display: flex;

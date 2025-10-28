@@ -6,14 +6,14 @@ CREATE TABLE pl_transactions (
   transaction_date DATE NOT NULL,
   description TEXT NOT NULL,
   amount NUMERIC(10,2) NOT NULL,
-  type TEXT NOT NULL,  -- 'income' or 'expense'
+  type TEXT NOT NULL,  -- 'income', 'expense', 'cash-flow'
   category TEXT,
   property TEXT,
   job TEXT,  -- keeping for data migration, but won't use
-  account TEXT NOT NULL,
+  account TEXT,
   transaction_type TEXT NOT NULL,  -- 'business' or 'personal'
   source TEXT,
-  original_id TEXT,  -- preserve original Google Sheets ID
+  original_id TEXT,  -- preserve original ID from backup
   created_at TIMESTAMP DEFAULT NOW(),
   modified_at TIMESTAMP DEFAULT NOW()
 );

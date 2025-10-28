@@ -9,8 +9,8 @@ const appState = {
     properties: [],
     categories: [],
     accounts: [],
-    currentScreen: 'import',
-    csvData: null,
+    currentScreen: 'assign',  // Default to Property Assignment screen
+    jsonData: null,
 
     // Assignment Screen State
     assignFilters: {
@@ -117,47 +117,14 @@ function formatDate(dateString) {
     });
 }
 
-function parseCSV(text) {
-    const lines = text.split('\n').filter(line => line.trim());
-    if (lines.length < 2) return [];
-
-    const headers = lines[0].split(',').map(h => h.trim());
-    const rows = [];
-
-    for (let i = 1; i < lines.length; i++) {
-        const values = parseCSVLine(lines[i]);
-        if (values.length === headers.length) {
-            const row = {};
-            headers.forEach((header, index) => {
-                row[header] = values[index].trim();
-            });
-            rows.push(row);
-        }
-    }
-
-    return rows;
-}
-
-function parseCSVLine(line) {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-
-        if (char === '"') {
-            inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-            result.push(current);
-            current = '';
-        } else {
-            current += char;
-        }
-    }
-
-    result.push(current);
-    return result;
+function parseISODate(isoString) {
+    // Parse ISO date string and return YYYY-MM-DD format
+    if (!isoString) return null;
+    const date = new Date(isoString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 function getDateRangeFilter(rangeType, customFrom = null, customTo = null) {
@@ -209,19 +176,22 @@ async function loadProperties() {
 
 async function loadCategories() {
     try {
+        // Load unique categories from pl_transactions
         const { data, error } = await supabaseClient
-            .from('categories')
-            .select('name')
-            .eq('active', true)
-            .order('sort_order');
+            .from('pl_transactions')
+            .select('category')
+            .not('category', 'is', null)
+            .order('category');
 
         if (error) throw error;
 
-        appState.categories = data || [];
+        // Get unique categories
+        const uniqueCategories = [...new Set(data.map(row => row.category))].filter(cat => cat && cat.trim() !== '');
+        appState.categories = uniqueCategories.sort();
         populateCategoryDropdowns();
     } catch (error) {
         console.error('Error loading categories:', error);
-        showToast('Error loading categories', 'error');
+        appState.categories = [];
     }
 }
 
@@ -230,11 +200,12 @@ async function loadAccounts() {
         const { data, error } = await supabaseClient
             .from('pl_transactions')
             .select('account')
+            .not('account', 'is', null)
             .order('account');
 
         if (error) throw error;
 
-        const uniqueAccounts = [...new Set(data.map(row => row.account))];
+        const uniqueAccounts = [...new Set(data.map(row => row.account))].filter(acc => acc && acc.trim() !== '');
         appState.accounts = uniqueAccounts;
         populateAccountDropdowns();
     } catch (error) {
@@ -247,31 +218,57 @@ function populatePropertyDropdowns() {
     // Filter property dropdown (assignment screen)
     const filterProperty = document.getElementById('filter-property');
     filterProperty.innerHTML = '<option value="unassigned">Unassigned</option>';
+
+    // Add General/Corporate as a separate option
+    const generalOption = document.createElement('option');
+    generalOption.value = 'General/Corporate';
+    generalOption.textContent = 'General/Corporate';
+    filterProperty.appendChild(generalOption);
+
     appState.properties.forEach(prop => {
-        const option = document.createElement('option');
-        option.value = prop.name;
-        option.textContent = prop.name;
-        filterProperty.appendChild(option);
+        if (prop.name !== 'General/Corporate') {
+            const option = document.createElement('option');
+            option.value = prop.name;
+            option.textContent = prop.name;
+            filterProperty.appendChild(option);
+        }
     });
 
     // Bulk property select
     const bulkProperty = document.getElementById('bulk-property-select');
     bulkProperty.innerHTML = '<option value="">Choose Property...</option>';
+
+    // Add General/Corporate
+    const bulkGeneralOption = document.createElement('option');
+    bulkGeneralOption.value = 'General/Corporate';
+    bulkGeneralOption.textContent = 'General/Corporate';
+    bulkProperty.appendChild(bulkGeneralOption);
+
     appState.properties.forEach(prop => {
-        const option = document.createElement('option');
-        option.value = prop.name;
-        option.textContent = prop.name;
-        bulkProperty.appendChild(option);
+        if (prop.name !== 'General/Corporate') {
+            const option = document.createElement('option');
+            option.value = prop.name;
+            option.textContent = prop.name;
+            bulkProperty.appendChild(option);
+        }
     });
 
     // View screen property filter
     const viewProperty = document.getElementById('view-property');
-    viewProperty.innerHTML = '<option value="all">All</option>';
+    viewProperty.innerHTML = '<option value="all">All</option><option value="unassigned">Unassigned</option>';
+
+    const viewGeneralOption = document.createElement('option');
+    viewGeneralOption.value = 'General/Corporate';
+    viewGeneralOption.textContent = 'General/Corporate';
+    viewProperty.appendChild(viewGeneralOption);
+
     appState.properties.forEach(prop => {
-        const option = document.createElement('option');
-        option.value = prop.name;
-        option.textContent = prop.name;
-        viewProperty.appendChild(option);
+        if (prop.name !== 'General/Corporate') {
+            const option = document.createElement('option');
+            option.value = prop.name;
+            option.textContent = prop.name;
+            viewProperty.appendChild(option);
+        }
     });
 }
 
@@ -281,8 +278,8 @@ function populateCategoryDropdowns() {
     filterCategory.innerHTML = '<option value="all">All</option>';
     appState.categories.forEach(cat => {
         const option = document.createElement('option');
-        option.value = cat.name;
-        option.textContent = cat.name;
+        option.value = cat;
+        option.textContent = cat;
         filterCategory.appendChild(option);
     });
 
@@ -291,8 +288,8 @@ function populateCategoryDropdowns() {
     viewCategory.innerHTML = '<option value="all">All</option>';
     appState.categories.forEach(cat => {
         const option = document.createElement('option');
-        option.value = cat.name;
-        option.textContent = cat.name;
+        option.value = cat;
+        option.textContent = cat;
         viewCategory.appendChild(option);
     });
 }
@@ -332,9 +329,9 @@ function switchScreen(screenName) {
     }
 }
 
-// ===== SCREEN 1: CSV IMPORT =====
+// ===== SCREEN 1: JSON IMPORT =====
 function initImportScreen() {
-    const fileInput = document.getElementById('csv-file-input');
+    const fileInput = document.getElementById('json-file-input');
     const uploadBtn = document.getElementById('upload-btn');
     const importBtn = document.getElementById('import-btn');
     const cancelImportBtn = document.getElementById('cancel-import-btn');
@@ -353,26 +350,46 @@ function handleFileSelect(event) {
 
     const reader = new FileReader();
     reader.onload = (e) => {
-        const text = e.target.result;
-        appState.csvData = parseCSV(text);
-        displayPreview();
+        try {
+            const text = e.target.result;
+            const jsonData = JSON.parse(text);
+
+            if (!jsonData.transactions || !Array.isArray(jsonData.transactions)) {
+                showToast('Invalid JSON format: missing "transactions" array', 'error');
+                return;
+            }
+
+            appState.jsonData = jsonData.transactions;
+            displayPreview();
+        } catch (error) {
+            showToast('Error parsing JSON file: ' + error.message, 'error');
+            console.error('JSON parse error:', error);
+        }
     };
     reader.readAsText(file);
 }
 
 function displayPreview() {
     const previewSection = document.getElementById('preview-section');
+    const previewCount = document.getElementById('preview-count');
+    const previewSample = document.getElementById('preview-sample');
     const previewHeader = document.getElementById('preview-header');
     const previewBody = document.getElementById('preview-body');
 
-    if (!appState.csvData || appState.csvData.length === 0) {
-        showToast('No data found in CSV file', 'error');
+    if (!appState.jsonData || appState.jsonData.length === 0) {
+        showToast('No transactions found in JSON file', 'error');
         return;
     }
 
-    // Show first 10 rows
-    const preview = appState.csvData.slice(0, 10);
-    const headers = Object.keys(preview[0]);
+    // Show transaction count
+    previewCount.textContent = appState.jsonData.length.toLocaleString();
+
+    // Show sample transaction
+    previewSample.textContent = JSON.stringify(appState.jsonData[0], null, 2);
+
+    // Show first 10 rows in table
+    const preview = appState.jsonData.slice(0, 10);
+    const headers = ['date', 'description', 'amount', 'type', 'category', 'property', 'account'];
 
     // Create header
     previewHeader.innerHTML = '';
@@ -390,7 +407,13 @@ function displayPreview() {
         const tr = document.createElement('tr');
         headers.forEach(header => {
             const td = document.createElement('td');
-            td.textContent = row[header] || '';
+            if (header === 'date') {
+                td.textContent = formatDate(row[header]);
+            } else if (header === 'amount') {
+                td.textContent = formatCurrency(row[header]);
+            } else {
+                td.textContent = row[header] || '';
+            }
             tr.appendChild(td);
         });
         previewBody.appendChild(tr);
@@ -400,14 +423,14 @@ function displayPreview() {
 }
 
 async function handleImport() {
-    if (!appState.csvData || appState.csvData.length === 0) {
+    if (!appState.jsonData || appState.jsonData.length === 0) {
         showToast('No data to import', 'error');
         return;
     }
 
     showModal(
         'Confirm Import',
-        `Import ${appState.csvData.length} transactions from CSV?`,
+        `Import ${appState.jsonData.length.toLocaleString()} transactions from JSON file?`,
         async () => {
             await performImport();
         }
@@ -415,49 +438,69 @@ async function handleImport() {
 }
 
 async function performImport() {
-    showLoading(`Importing ${appState.csvData.length} transactions...`);
-
+    const totalTransactions = appState.jsonData.length;
+    const batchSize = 100;
     let importedCount = 0;
     let skippedCount = 0;
 
+    showLoading(`Importing ${totalTransactions.toLocaleString()} transactions...`);
+
     try {
-        for (const row of appState.csvData) {
-            // Check for duplicate
-            const isDuplicate = await checkDuplicate(row.date, row.description, row.amount);
+        // Process in batches
+        for (let i = 0; i < totalTransactions; i += batchSize) {
+            const batch = appState.jsonData.slice(i, i + batchSize);
+            const progress = Math.round((i / totalTransactions) * 100);
+            showLoading(`Importing... ${progress}% (${i.toLocaleString()} of ${totalTransactions.toLocaleString()})`);
 
-            if (isDuplicate) {
-                skippedCount++;
-                continue;
+            for (const transaction of batch) {
+                // Check for duplicate
+                const isDuplicate = await checkDuplicate(
+                    transaction.date,
+                    transaction.description,
+                    transaction.amount
+                );
+
+                if (isDuplicate) {
+                    skippedCount++;
+                    continue;
+                }
+
+                // Prepare transaction data
+                const transactionData = {
+                    transaction_date: parseISODate(transaction.date),
+                    description: transaction.description,
+                    amount: parseFloat(transaction.amount),
+                    type: transaction.type,
+                    category: transaction.category || null,
+                    property: (transaction.property && transaction.property.trim() !== '') ? transaction.property : null,
+                    job: transaction.job ? String(transaction.job) : null,
+                    account: (transaction.account && transaction.account.trim() !== '') ? transaction.account : null,
+                    transaction_type: transaction.transactionType,
+                    source: transaction.source || null,
+                    original_id: transaction.id || null
+                };
+
+                // Insert transaction
+                const { error } = await supabaseClient
+                    .from('pl_transactions')
+                    .insert(transactionData);
+
+                if (error) {
+                    console.error('Error inserting transaction:', error, transactionData);
+                } else {
+                    importedCount++;
+                }
             }
 
-            // Insert transaction
-            const { error } = await supabaseClient
-                .from('pl_transactions')
-                .insert({
-                    transaction_date: row.date,
-                    description: row.description,
-                    amount: parseFloat(row.amount),
-                    type: row.type,
-                    category: row.category || null,
-                    property: row.property || null,
-                    job: row.job || null,
-                    account: row.account,
-                    transaction_type: row.transactionType,
-                    source: row.source || null,
-                    original_id: row.id || null
-                });
-
-            if (error) {
-                console.error('Error inserting transaction:', error);
-            } else {
-                importedCount++;
-            }
+            // Small delay to prevent overwhelming the server
+            await new Promise(resolve => setTimeout(resolve, 100));
         }
 
         hideLoading();
-        displayImportResults(importedCount, skippedCount, appState.csvData.length);
+        displayImportResults(importedCount, skippedCount, totalTransactions);
 
-        // Refresh accounts list
+        // Refresh data
+        await loadCategories();
         await loadAccounts();
 
     } catch (error) {
@@ -469,10 +512,12 @@ async function performImport() {
 
 async function checkDuplicate(date, description, amount) {
     try {
+        const transactionDate = parseISODate(date);
+
         const { data, error } = await supabaseClient
             .from('pl_transactions')
             .select('id')
-            .eq('transaction_date', date)
+            .eq('transaction_date', transactionDate)
             .eq('description', description)
             .eq('amount', parseFloat(amount))
             .limit(1);
@@ -490,22 +535,22 @@ function displayImportResults(imported, skipped, total) {
     document.getElementById('preview-section').classList.add('hidden');
 
     const resultsSection = document.getElementById('import-results');
-    document.getElementById('imported-count').textContent = imported;
-    document.getElementById('skipped-count').textContent = skipped;
-    document.getElementById('total-count').textContent = total;
+    document.getElementById('imported-count').textContent = imported.toLocaleString();
+    document.getElementById('skipped-count').textContent = skipped.toLocaleString();
+    document.getElementById('total-count').textContent = total.toLocaleString();
 
     resultsSection.classList.remove('hidden');
 
     if (imported > 0) {
-        showToast(`Successfully imported ${imported} transactions`, 'success');
+        showToast(`Successfully imported ${imported.toLocaleString()} transactions`, 'success');
     }
 }
 
 function resetImportScreen() {
-    document.getElementById('csv-file-input').value = '';
+    document.getElementById('json-file-input').value = '';
     document.getElementById('preview-section').classList.add('hidden');
     document.getElementById('import-results').classList.add('hidden');
-    appState.csvData = null;
+    appState.jsonData = null;
 }
 
 // ===== SCREEN 2: PROPERTY ASSIGNMENT =====
@@ -605,9 +650,10 @@ async function loadAssignmentScreen() {
             .from('pl_transactions')
             .select('*', { count: 'exact' });
 
-        // Apply filters
+        // Apply property filter with new "Unassigned" logic
         if (appState.assignFilters.property === 'unassigned') {
-            query = query.is('property', null);
+            // Unassigned = NULL or empty string or 'General/Corporate'
+            query = query.or('property.is.null,property.eq.,property.eq.General/Corporate');
         } else if (appState.assignFilters.property !== 'all') {
             query = query.eq('property', appState.assignFilters.property);
         }
@@ -663,24 +709,27 @@ async function loadAssignmentScreen() {
 
 async function updateProgressIndicator() {
     try {
-        const { count, error } = await supabaseClient
+        // Count unassigned (NULL or empty or General/Corporate)
+        const { count: unassignedCount, error: error1 } = await supabaseClient
             .from('pl_transactions')
             .select('*', { count: 'exact', head: true })
-            .is('property', null);
+            .or('property.is.null,property.eq.,property.eq.General/Corporate');
 
-        if (error) throw error;
+        if (error1) throw error1;
 
-        const unassignedCount = count || 0;
-
-        const { count: totalCount } = await supabaseClient
+        // Count total
+        const { count: totalCount, error: error2 } = await supabaseClient
             .from('pl_transactions')
             .select('*', { count: 'exact', head: true });
 
+        if (error2) throw error2;
+
+        const unassigned = unassignedCount || 0;
         const total = totalCount || 0;
-        const assigned = total - unassignedCount;
+        const assigned = total - unassigned;
 
         document.getElementById('progress-text').textContent =
-            `${unassignedCount} of ${total} transactions need property assignment (${assigned} assigned)`;
+            `${unassigned.toLocaleString()} of ${total.toLocaleString()} transactions need property assignment (${assigned.toLocaleString()} assigned)`;
     } catch (error) {
         console.error('Error updating progress:', error);
         document.getElementById('progress-text').textContent = 'Unable to load progress';
@@ -724,7 +773,10 @@ function displayAssignmentTable(transactions) {
 
         // Description
         const tdDesc = document.createElement('td');
-        tdDesc.textContent = transaction.description;
+        tdDesc.textContent = transaction.description.length > 50
+            ? transaction.description.substring(0, 50) + '...'
+            : transaction.description;
+        tdDesc.title = transaction.description; // Show full description on hover
         tr.appendChild(tdDesc);
 
         // Amount
@@ -740,16 +792,20 @@ function displayAssignmentTable(transactions) {
 
         // Account
         const tdAccount = document.createElement('td');
-        tdAccount.textContent = transaction.account;
+        tdAccount.textContent = transaction.account || '-';
         tr.appendChild(tdAccount);
 
         // Property
         const tdProperty = document.createElement('td');
-        if (transaction.property) {
-            tdProperty.textContent = transaction.property;
-        } else {
+        const isUnassigned = !transaction.property ||
+                             transaction.property === '' ||
+                             transaction.property === 'General/Corporate';
+
+        if (isUnassigned) {
             tdProperty.textContent = 'Unassigned';
             tdProperty.className = 'property-unassigned';
+        } else {
+            tdProperty.textContent = transaction.property;
         }
         tr.appendChild(tdProperty);
 
@@ -763,7 +819,8 @@ function updateAssignmentPagination(totalCount) {
     const prevBtn = document.getElementById('assign-prev-btn');
     const nextBtn = document.getElementById('assign-next-btn');
 
-    pageInfo.textContent = `Page ${appState.assignPage} of ${totalPages || 1}`;
+    const showing = Math.min(appState.assignPageSize, totalCount - (appState.assignPage - 1) * appState.assignPageSize);
+    pageInfo.textContent = `Page ${appState.assignPage} of ${totalPages || 1} (Showing ${showing} of ${totalCount.toLocaleString()} transactions)`;
     prevBtn.disabled = appState.assignPage <= 1;
     nextBtn.disabled = appState.assignPage >= totalPages;
 }
@@ -802,7 +859,7 @@ async function handleBulkAssignment() {
 
     showModal(
         'Confirm Property Assignment',
-        `Assign ${selectedCount} transactions to ${selectedProperty}?`,
+        `Assign ${selectedCount.toLocaleString()} transactions to ${selectedProperty}?`,
         async () => {
             await performBulkAssignment(selectedProperty);
         }
@@ -815,14 +872,18 @@ async function performBulkAssignment(propertyName) {
     try {
         const ids = Array.from(appState.assignSelectedIds);
 
+        // Batch update for performance
         const { error } = await supabaseClient
             .from('pl_transactions')
-            .update({ property: propertyName })
+            .update({
+                property: propertyName,
+                modified_at: new Date().toISOString()
+            })
             .in('id', ids);
 
         if (error) throw error;
 
-        showToast(`Successfully assigned ${ids.length} transactions to ${propertyName}`, 'success');
+        showToast(`Successfully assigned ${ids.length.toLocaleString()} transactions to ${propertyName}`, 'success');
 
         // Clear selections
         appState.assignSelectedIds.clear();
@@ -936,7 +997,9 @@ async function loadViewScreen() {
             query = query.ilike('description', `%${appState.viewFilters.search}%`);
         }
 
-        if (appState.viewFilters.property !== 'all') {
+        if (appState.viewFilters.property === 'unassigned') {
+            query = query.or('property.is.null,property.eq.,property.eq.General/Corporate');
+        } else if (appState.viewFilters.property !== 'all') {
             query = query.eq('property', appState.viewFilters.property);
         }
 
@@ -976,7 +1039,7 @@ async function loadViewScreen() {
 
         displayViewTable(data || []);
         updateViewPagination(count || 0);
-        document.getElementById('view-total-count').textContent = `Showing ${count || 0} transactions`;
+        document.getElementById('view-total-count').textContent = `Showing ${count ? count.toLocaleString() : 0} transactions`;
 
         hideLoading();
     } catch (error) {
@@ -1021,15 +1084,21 @@ function displayViewTable(transactions) {
 
         // Property
         const tdProperty = document.createElement('td');
-        tdProperty.textContent = transaction.property || 'Unassigned';
-        if (!transaction.property) {
+        const isUnassigned = !transaction.property ||
+                             transaction.property === '' ||
+                             transaction.property === 'General/Corporate';
+
+        if (isUnassigned) {
+            tdProperty.textContent = 'Unassigned';
             tdProperty.className = 'property-unassigned';
+        } else {
+            tdProperty.textContent = transaction.property;
         }
         tr.appendChild(tdProperty);
 
         // Account
         const tdAccount = document.createElement('td');
-        tdAccount.textContent = transaction.account;
+        tdAccount.textContent = transaction.account || '-';
         tr.appendChild(tdAccount);
 
         // Transaction Type
@@ -1066,7 +1135,9 @@ async function handleExportCSV() {
             query = query.ilike('description', `%${appState.viewFilters.search}%`);
         }
 
-        if (appState.viewFilters.property !== 'all') {
+        if (appState.viewFilters.property === 'unassigned') {
+            query = query.or('property.is.null,property.eq.,property.eq.General/Corporate');
+        } else if (appState.viewFilters.property !== 'all') {
             query = query.eq('property', appState.viewFilters.property);
         }
 
@@ -1129,7 +1200,7 @@ function generateCSV(data) {
         row.type,
         row.category || '',
         row.property || '',
-        row.account,
+        row.account || '',
         row.transaction_type
     ]);
 
@@ -1191,7 +1262,7 @@ async function init() {
     });
 
     // Load default screen (Property Assignment)
-    switchScreen('assign');
+    await loadAssignmentScreen();
 
     hideLoading();
 }
