@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P&L Transaction Manager</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="nav-logo">P&L Transaction Manager</h1>
+            <div class="nav-menu">
+                <button class="nav-button active" data-screen="import">Import CSV</button>
+                <button class="nav-button" data-screen="assign">Property Assignment</button>
+                <button class="nav-button" data-screen="view">All Transactions</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <p id="loading-text">Loading...</p>
+    </div>
+
+    <!-- Main Content Container -->
+    <div class="main-container">
+
+        <!-- SCREEN 1: CSV IMPORT -->
+        <div id="import-screen" class="screen active">
+            <div class="screen-header">
+                <h2>Import Transactions from CSV</h2>
+                <p class="subtitle">Upload your CSV file to import transactions into the database</p>
+            </div>
+
+            <div class="import-section">
+                <div class="upload-area">
+                    <input type="file" id="csv-file-input" accept=".csv" hidden>
+                    <button id="upload-btn" class="btn btn-primary btn-large">
+                        <span class="btn-icon">📁</span>
+                        Choose CSV File
+                    </button>
+                    <p class="helper-text">Expected format: id, date, description, amount, type, category, property, job, account, transactionType, source, created, modified</p>
+                </div>
+
+                <div id="preview-section" class="preview-section hidden">
+                    <h3>Preview (First 10 Rows)</h3>
+                    <div class="table-container">
+                        <table id="preview-table" class="data-table">
+                            <thead id="preview-header"></thead>
+                            <tbody id="preview-body"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="import-actions">
+                        <button id="import-btn" class="btn btn-success btn-large">
+                            <span class="btn-icon">⬆️</span>
+                            Import Transactions
+                        </button>
+                        <button id="cancel-import-btn" class="btn btn-secondary">Cancel</button>
+                    </div>
+                </div>
+
+                <div id="import-results" class="import-results hidden">
+                    <h3>Import Results</h3>
+                    <div class="results-summary">
+                        <div class="result-item success">
+                            <span class="result-label">Imported:</span>
+                            <span id="imported-count" class="result-value">0</span>
+                        </div>
+                        <div class="result-item warning">
+                            <span class="result-label">Duplicates Skipped:</span>
+                            <span id="skipped-count" class="result-value">0</span>
+                        </div>
+                        <div class="result-item info">
+                            <span class="result-label">Total Processed:</span>
+                            <span id="total-count" class="result-value">0</span>
+                        </div>
+                    </div>
+                    <button id="import-another-btn" class="btn btn-primary">Import Another File</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SCREEN 2: PROPERTY ASSIGNMENT -->
+        <div id="assign-screen" class="screen">
+            <div class="screen-header">
+                <h2>Property Assignment Tool</h2>
+                <div id="progress-indicator" class="progress-indicator">
+                    <span id="progress-text">Loading...</span>
+                </div>
+            </div>
+
+            <!-- Filter Section -->
+            <div class="filter-section">
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label for="filter-property">Property:</label>
+                        <select id="filter-property" class="filter-select">
+                            <option value="unassigned">Unassigned</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="filter-category">Category:</label>
+                        <select id="filter-category" class="filter-select">
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="filter-date-range">Date Range:</label>
+                        <select id="filter-date-range" class="filter-select">
+                            <option value="all">All Time</option>
+                            <option value="this-year">This Year</option>
+                            <option value="last-year">Last Year</option>
+                            <option value="custom">Custom Range</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="filter-account">Account:</label>
+                        <select id="filter-account" class="filter-select">
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="filter-transaction-type">Type:</label>
+                        <select id="filter-transaction-type" class="filter-select">
+                            <option value="business">Business</option>
+                            <option value="all">All</option>
+                            <option value="personal">Personal</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="custom-date-range" class="custom-date-range hidden">
+                    <div class="filter-group">
+                        <label for="filter-date-from">From:</label>
+                        <input type="date" id="filter-date-from" class="filter-input">
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-date-to">To:</label>
+                        <input type="date" id="filter-date-to" class="filter-input">
+                    </div>
+                    <button id="apply-date-range" class="btn btn-secondary btn-small">Apply</button>
+                </div>
+            </div>
+
+            <!-- Bulk Assignment Section -->
+            <div class="bulk-section">
+                <div class="bulk-controls">
+                    <div class="bulk-left">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="select-all-checkbox">
+                            <span>Select All Visible</span>
+                        </label>
+                        <span id="selected-count" class="selected-count">0 transactions selected</span>
+                    </div>
+                    <div class="bulk-right">
+                        <label for="bulk-property-select">Assign selected to:</label>
+                        <select id="bulk-property-select" class="filter-select">
+                            <option value="">Choose Property...</option>
+                        </select>
+                        <button id="assign-property-btn" class="btn btn-success" disabled>Assign Property</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transaction Table -->
+            <div class="table-section">
+                <div class="table-container">
+                    <table id="assign-table" class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="checkbox-col"></th>
+                                <th class="sortable" data-sort="transaction_date">Date <span class="sort-icon">↕</span></th>
+                                <th class="sortable" data-sort="description">Description <span class="sort-icon">↕</span></th>
+                                <th class="sortable" data-sort="amount">Amount <span class="sort-icon">↕</span></th>
+                                <th class="sortable" data-sort="category">Category <span class="sort-icon">↕</span></th>
+                                <th class="sortable" data-sort="account">Account <span class="sort-icon">↕</span></th>
+                                <th class="sortable" data-sort="property">Current Property <span class="sort-icon">↕</span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="assign-table-body">
+                            <tr>
+                                <td colspan="7" class="no-data">Loading transactions...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination">
+                    <button id="assign-prev-btn" class="btn btn-secondary btn-small" disabled>Previous</button>
+                    <span id="assign-page-info" class="page-info">Page 1 of 1</span>
+                    <button id="assign-next-btn" class="btn btn-secondary btn-small" disabled>Next</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SCREEN 3: ALL TRANSACTIONS VIEW -->
+        <div id="view-screen" class="screen">
+            <div class="screen-header">
+                <h2>All Transactions</h2>
+                <div class="export-buttons">
+                    <button id="export-csv-btn" class="btn btn-secondary">
+                        <span class="btn-icon">📄</span>
+                        Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Section -->
+            <div class="filter-section">
+                <div class="filter-row">
+                    <div class="filter-group filter-group-wide">
+                        <label for="view-search">Search:</label>
+                        <input type="text" id="view-search" class="filter-input" placeholder="Search descriptions...">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="view-property">Property:</label>
+                        <select id="view-property" class="filter-select">
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="view-category">Category:</label>
+                        <select id="view-category" class="filter-select">
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="view-transaction-type">Type:</label>
+                        <select id="view-transaction-type" class="filter-select">
+                            <option value="business">Business</option>
+                            <option value="all">All</option>
+                            <option value="personal">Personal</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="view-date-range">Date Range:</label>
+                        <select id="view-date-range" class="filter-select">
+                            <option value="this-year">This Year</option>
+                            <option value="all">All Time</option>
+                            <option value="last-year">Last Year</option>
+                            <option value="custom">Custom Range</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="view-custom-date-range" class="custom-date-range hidden">
+                    <div class="filter-group">
+                        <label for="view-date-from">From:</label>
+                        <input type="date" id="view-date-from" class="filter-input">
+                    </div>
+                    <div class="filter-group">
+                        <label for="view-date-to">To:</label>
+                        <input type="date" id="view-date-to" class="filter-input">
+                    </div>
+                    <button id="view-apply-date-range" class="btn btn-secondary btn-small">Apply</button>
+                </div>
+            </div>
+
+            <!-- Transaction Count -->
+            <div class="transaction-count">
+                <span id="view-total-count">Showing 0 transactions</span>
+            </div>
+
+            <!-- Transaction Table -->
+            <div class="table-section">
+                <div class="table-container">
+                    <table id="view-table" class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="transaction_date">Date <span class="sort-icon">↕</span></th>
+                                <th class="sortable" data-sort="description">Description <span class="sort-icon">↕</span></th>
+                                <th class="sortable" data-sort="amount">Amount <span class="sort-icon">↕</span></th>
+                                <th class="sortable" data-sort="category">Category <span class="sort-icon">↕</span></th>
+                                <th class="sortable" data-sort="property">Property <span class="sort-icon">↕</span></th>
+                                <th class="sortable" data-sort="account">Account <span class="sort-icon">↕</span></th>
+                                <th class="sortable" data-sort="transaction_type">Type <span class="sort-icon">↕</span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="view-table-body">
+                            <tr>
+                                <td colspan="7" class="no-data">Loading transactions...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination">
+                    <button id="view-prev-btn" class="btn btn-secondary btn-small" disabled>Previous</button>
+                    <span id="view-page-info" class="page-info">Page 1 of 1</span>
+                    <button id="view-next-btn" class="btn btn-secondary btn-small" disabled>Next</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmation-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="modal-title">Confirm Action</h3>
+            <p id="modal-message">Are you sure?</p>
+            <div class="modal-actions">
+                <button id="modal-confirm-btn" class="btn btn-success">Confirm</button>
+                <button id="modal-cancel-btn" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
