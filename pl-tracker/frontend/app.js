@@ -653,7 +653,7 @@ async function loadAssignmentScreen() {
         // Apply property filter with new "Unassigned" logic
         if (appState.assignFilters.property === 'unassigned') {
             // Unassigned = NULL or empty string or 'General/Corporate'
-            query = query.or('property.is.null,property.eq.,property.eq.General/Corporate');
+            query = query.or('property.is.null,property.eq.\'\',property.eq.General/Corporate');
         } else if (appState.assignFilters.property !== 'all') {
             query = query.eq('property', appState.assignFilters.property);
         }
@@ -713,7 +713,7 @@ async function updateProgressIndicator() {
         const { count: unassignedCount, error: error1 } = await supabaseClient
             .from('pl_transactions')
             .select('*', { count: 'exact', head: true })
-            .or('property.is.null,property.eq.,property.eq.General/Corporate');
+            .or('property.is.null,property.eq.\'\',property.eq.General/Corporate');
 
         if (error1) throw error1;
 
@@ -998,7 +998,7 @@ async function loadViewScreen() {
         }
 
         if (appState.viewFilters.property === 'unassigned') {
-            query = query.or('property.is.null,property.eq.,property.eq.General/Corporate');
+            query = query.or('property.is.null,property.eq.\'\',property.eq.General/Corporate');
         } else if (appState.viewFilters.property !== 'all') {
             query = query.eq('property', appState.viewFilters.property);
         }
@@ -1136,7 +1136,7 @@ async function handleExportCSV() {
         }
 
         if (appState.viewFilters.property === 'unassigned') {
-            query = query.or('property.is.null,property.eq.,property.eq.General/Corporate');
+            query = query.or('property.is.null,property.eq.\'\',property.eq.General/Corporate');
         } else if (appState.viewFilters.property !== 'all') {
             query = query.eq('property', appState.viewFilters.property);
         }
